@@ -3,19 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculator Panel</title>
-
-    <!-- CSS -->
+    <title>CLT Floor Panel Properties Calculator</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+
+        .section-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,.08);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .method-btn {
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .method-btn.active {
+            box-shadow: 0 0 0 3px #0d6efd55;
+        }
+
+        .result-highlight {
+            background: linear-gradient(135deg, #0d6efd15, #0d6efd05);
+            border-left: 4px solid #0d6efd;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+        }
+
+        .table th, .table td { vertical-align: middle; font-size: .88rem; }
+        .table thead th { background-color: #f1f3f5; font-weight: 600; }
+
+        .badge-method {
+            font-size: .75rem;
+            padding: .35em .65em;
+        }
+
+        h5.section-title {
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+
+        .formula-note {
+            font-size: .8rem;
+            color: #6c757d;
+        }
+    </style>
 </head>
 <body>
-    <div class="container py-4">
-        <h1 class="mb-4">Calculator Panel</h1>
-        <!-- Write Input On Here -->
+<div class="container py-4" style="max-width: 1100px;">
+
+    <!-- ── Header ──────────────────────────────────────────────────────────── -->
+    <div class="mb-4">
+        <h2 class="fw-bold mb-1">CLT Floor Panel Properties Calculator</h2>
+        <p class="text-muted mb-0">
+            Kalkulasi kekakuan lentur efektif panel CLT berdasarkan
+            <em>proHolz Vol.1, Sections 4.1.3 &amp; 4.2</em>
+        </p>
     </div>
 
-    <!-- Script -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="calculator.js"></script>
+    <!-- ── Error Alert ──────────────────────────────────────────────────────── -->
+    <div id="calc-error" class="alert alert-danger d-none" role="alert"></div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- INPUT SECTION                                                          -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div class="section-card">
+        <h5 class="section-title">Input Panel</h5>
+
+        <!-- Baris 1: Metode analisis -->
+        <div class="row g-3 mb-3 align-items-end">
+            <div class="col-12">
+                <label class="form-label fw-semibold">Metode Analisis</label>
+                <div class="d-flex gap-3 flex-wrap">
+                    <!-- Shear Analogy -->
+                    <div class="card method-btn active border-primary flex-fill"
+                         id="btn-shear"
+                         onclick="selectMethod('ShearAnalogy')"
+                         style="max-width:320px; cursor:pointer;">
+                        <div class="card-body py-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1 fw-bold">Shear Analogy</h6>
+                                    <p class="mb-0 text-muted small">proHolz Vol.1, §4.1.3</p>
+                                </div>
+                                <span class="badge bg-primary badge-method">3–9 Layer</span>
+                            </div>
+                            <div id="info-shear" class="mt-2">
+                                <p class="small text-muted mb-0">
+                                    Simetris atas–bawah wajib. Semua layer berkontribusi ke kekakuan lentur.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gamma -->
+                    <div class="card method-btn border flex-fill"
+                         id="btn-gamma"
+                         onclick="selectMethod('Gamma')"
+                         style="max-width:320px; cursor:pointer;">
+                        <div class="card-body py-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1 fw-bold">Gamma (γ)</h6>
+                                    <p class="mb-0 text-muted small">proHolz Vol.1, §4.2</p>
+                                </div>
+                                <span class="badge bg-warning text-dark badge-method">3 atau 5 Layer</span>
+                            </div>
+                            <div id="info-gamma" class="mt-2 d-none">
+                                <p class="small text-muted mb-0">
+                                    Memperhitungkan deformasi geser antar-layer. Hanya layer 0° yang aktif.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Baris 2: Parameter panel -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-3 col-sm-6">
+                <label for="layer-count" class="form-label fw-semibold">Jumlah Layer</label>
+                <select class="form-select" id="layer-count"></select>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <label for="grade" class="form-label fw-semibold">Material Grade</label>
+                <select class="form-select" id="grade">
+                    <option value="MGP10">MGP10 — E=1100 MPa</option>
+                    <option value="MGP12">MGP12 — E=1100 MPa</option>
+                </select>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <label for="beff" class="form-label fw-semibold">b<sub>eff</sub> (mm)</label>
+                <input type="number" class="form-control" id="beff" value="1000" min="1" step="50">
+                <div class="form-text">Lebar efektif panel</div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <label for="lref" class="form-label fw-semibold">L<sub>ref</sub> (m)</label>
+                <input type="number" class="form-control" id="lref" value="5" min="0.1" step="0.5">
+                <div class="form-text">Panjang referensi (Gamma saja)</div>
+            </div>
+        </div>
+
+        <!-- Baris 3: Tabel input layer -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover mb-0">
+                <thead>
+                    <tr class="text-center">
+                        <th style="width:100px">Layer</th>
+                        <th>Tebal t<sub>i</sub> (mm)</th>
+                        <th>Orientasi Serat</th>
+                        <th>Material Grade</th>
+                    </tr>
+                </thead>
+                <tbody id="layer-inputs">
+                    <!-- Diisi oleh JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Tombol Hitung -->
+        <div class="mt-3 d-flex justify-content-end">
+            <button class="btn btn-primary px-5" onclick="runCalculation()">
+                Hitung Panel Properties
+            </button>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- OUTPUT / RESULT SECTION                                                -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div id="result-section" class="d-none">
+        <div class="section-card">
+            <h5 class="section-title">Hasil Panel Properties</h5>
+
+            <!-- Summary cards -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3 col-sm-6">
+                    <div class="result-highlight h-100">
+                        <div class="text-muted small">Metode</div>
+                        <div class="fw-bold fs-6" id="res-method">—</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="result-highlight h-100">
+                        <div class="text-muted small">Jumlah Layer</div>
+                        <div class="fw-bold fs-6" id="res-layers">—</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="result-highlight h-100">
+                        <div class="text-muted small">Total Tebal Panel</div>
+                        <div class="fw-bold fs-6" id="res-total-t">—</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="result-highlight h-100">
+                        <div class="text-muted small">b<sub>eff</sub></div>
+                        <div class="fw-bold fs-6" id="res-beff">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EIeff utama -->
+            <div class="result-highlight mb-4 text-center">
+                <div class="text-muted small mb-1">Effective Bending Stiffness (EI<sub>eff</sub>)</div>
+                <div class="fw-bold" style="font-size:1.6rem; color:#0d6efd;" id="res-EIeff">—</div>
+                <div class="formula-note mt-1">EI<sub>eff</sub> = Σ Eᵢ · (b<sub>eff</sub>·tᵢ³/12 + b<sub>eff</sub>·tᵢ·hᵢ²)</div>
+            </div>
+
+            <!-- Tabel detail per layer -->
+            <h6 class="fw-semibold mb-2">Detail Per Layer</h6>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr class="text-center">
+                            <th>Layer</th>
+                            <th>tᵢ (mm)</th>
+                            <th>Sudut</th>
+                            <th>Eᵢ,XX (MPa)</th>
+                            <th>yᵢ (mm)</th>
+                            <th>hᵢ (mm)</th>
+                            <th>Gᵢ (MPa)</th>
+                            <th>b·tᵢ³/12 (mm⁴)</th>
+                            <th>b·tᵢ·hᵢ² (mm⁴)</th>
+                            <th>EᵢIᵢ (N·mm²/m)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="result-table-body">
+                        <!-- Diisi JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Gamma extra info -->
+            <div id="gamma-extra" class="d-none"></div>
+
+            <!-- Referensi -->
+            <p class="formula-note mt-3">
+                Referensi: <em>proHolz – Timber Engineering Vol.1, §4.1.3 (Shear Analogy) &amp; §4.2 (Gamma Method)</em>
+            </p>
+        </div>
+    </div>
+
+</div><!-- /container -->
+
+<!-- ── Scripts ─────────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Types -->
+<script src="type/material-grade-type.js"></script>
+<script src="type/clt-layer-type.js"></script>
+<script src="type/clt-layup-type.js"></script>
+<script src="type/clt-layer-properties-type.js"></script>
+<script src="type/panel-properties-type.js"></script>
+
+<!-- Calculation -->
+<script src="calculation/panel-properties.js"></script>
+
+<!-- Main app -->
+<script src="calculator.js"></script>
+
+<script>
+/**
+ * Menangani klik kartu metode analisis.
+ * @param {'ShearAnalogy'|'Gamma'} method
+ */
+function selectMethod(method) {
+    currentMethod = method;
+
+    // Toggle class active pada kartu
+    document.getElementById('btn-shear').classList.toggle('active',    method === 'ShearAnalogy');
+    document.getElementById('btn-shear').classList.toggle('border-primary', method === 'ShearAnalogy');
+    document.getElementById('btn-gamma').classList.toggle('active',    method === 'Gamma');
+    document.getElementById('btn-gamma').classList.toggle('border-primary', method === 'Gamma');
+
+    onMethodChange(method);
+}
+</script>
 </body>
 </html>
