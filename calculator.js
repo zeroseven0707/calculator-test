@@ -16,7 +16,7 @@
 // ── Dark mode ─────────────────────────────────────────────────────────────────
 (function () {
     const saved = localStorage.getItem('clt-theme');
-    if (saved !== 'light') document.documentElement.setAttribute('data-theme', 'dark');
+    if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
 })();
 
 function toggleTheme() {
