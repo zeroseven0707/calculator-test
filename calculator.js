@@ -10,7 +10,29 @@
  *  - Comparison Mode (SA vs Gamma side-by-side, 3 & 5 layer only)
  *  - CSV export
  *  - Alternating-orientation warning
+ *  - Dark mode toggle (persisted via localStorage)
  */
+
+// ── Dark mode ─────────────────────────────────────────────────────────────────
+(function () {
+    const saved = localStorage.getItem('clt-theme');
+    if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+})();
+
+function toggleTheme() {
+    const html  = document.documentElement;
+    const label = document.getElementById('theme-label');
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+        html.removeAttribute('data-theme');
+        if (label) label.textContent = 'Light';
+        localStorage.setItem('clt-theme', 'light');
+    } else {
+        html.setAttribute('data-theme', 'dark');
+        if (label) label.textContent = 'Dark';
+        localStorage.setItem('clt-theme', 'dark');
+    }
+}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let currentMethod = 'ShearAnalogy';
@@ -19,16 +41,24 @@ let comparisonMode = false;
 
 // ── Layup Presets ─────────────────────────────────────────────────────────────
 const PRESETS = {
-    '3L-35':    { n: 3, thicknesses: [35, 35, 35],          label: '3L-35/35/35' },
-    '5L-35':    { n: 5, thicknesses: [35, 35, 35, 35, 35],  label: '5L-35/35/35/35/35' },
-    '5L-40-20': { n: 5, thicknesses: [40, 20, 40, 20, 40],  label: '5L-40/20/40/20/40' },
-    '5L-35-20': { n: 5, thicknesses: [35, 20, 35, 20, 35],  label: '5L-35/20/35/20/35' },
-    '7L-35':    { n: 7, thicknesses: [35,35,35,35,35,35,35], label: '7L-35 (semua)' },
+    '3L-35':    { n: 3, thicknesses: [35, 35, 35],               label: '3L-35/35/35' },
+    '5L-35':    { n: 5, thicknesses: [35, 35, 35, 35, 35],       label: '5L-35/35/35/35/35' },
+    '5L-40-20': { n: 5, thicknesses: [40, 20, 40, 20, 40],       label: '5L-40/20/40/20/40' },
+    '5L-35-20': { n: 5, thicknesses: [35, 20, 35, 20, 35],       label: '5L-35/20/35/20/35' },
+    '7L-35':    { n: 7, thicknesses: [35,35,35,35,35,35,35],     label: '7L-35 (semua)' },
     '9L-35':    { n: 9, thicknesses: [35,35,35,35,35,35,35,35,35], label: '9L-35 (semua)' },
 };
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+// Sync icon on load + main boot
 document.addEventListener('DOMContentLoaded', () => {
+    // sync dark mode label
+    const label = document.getElementById('theme-label');
+    if (document.documentElement.getAttribute('data-theme') === 'dark') {
+        if (label) label.textContent = 'Dark';
+    }
+
+    // main boot
     updateLayerOptions();
     renderLayerInputs();
 

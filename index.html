@@ -37,6 +37,44 @@
     --sh-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
 }
 
+/* ── DARK MODE TOKENS ── */
+[data-theme="dark"] {
+    --ink:        #e2e8f0;
+    --ink-mid:    #94a3b8;
+    --ink-soft:   #64748b;
+    --ink-faint:  #475569;
+    --line:       #2d3748;
+    --line-soft:  #1e2636;
+    --bg:         #0f1623;
+    --white:      #1a2233;
+    --accent:     #818cf8;
+    --accent-h:   #6366f1;
+    --accent-bg:  #1e1b4b;
+    --accent-mid: #3730a3;
+    --green:      #34d399;
+    --green-bg:   #022c22;
+    --red:        #f87171;
+    --red-bg:     #2d1212;
+    --amber:      #fbbf24;
+    --amber-bg:   #271c06;
+    --purple:     #a78bfa;
+    --purple-bg:  #1e1040;
+    --sh-sm: 0 1px 3px rgba(0,0,0,.4), 0 1px 2px rgba(0,0,0,.3);
+    --sh-md: 0 4px 12px rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3);
+}
+
+/* dark overrides for elements that hardcode colours */
+[data-theme="dark"] .result-tbl thead th       { background: #0d1420; color: #475569; }
+[data-theme="dark"] .result-tbl tbody tr:nth-child(even) td { background: #1a2233; }
+[data-theme="dark"] .result-tbl tbody tr.row-total td { background: var(--accent-bg); }
+[data-theme="dark"] .preview-bar.par  { background: linear-gradient(90deg,#052e16,#064e3b); color:#6ee7b7; border-left-color:#059669; }
+[data-theme="dark"] .preview-bar.perp { background: linear-gradient(90deg,#0c1a2e,#0c2340); color:#7dd3fc; border-left-color:#0369a1; }
+[data-theme="dark"] .layer-stack tbody tr.perp-row { background: #0c1e2e; }
+[data-theme="dark"] .chip-par  { background:#052e16; color:#6ee7b7; }
+[data-theme="dark"] .chip-perp { background:#0c1a3e; color:#93c5fd; }
+[data-theme="dark"] .chip-eff  { background:var(--accent-bg); color:var(--accent); }
+[data-theme="dark"] .method-card:has(input:checked) { background: var(--accent-bg); }
+
 body {
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     background: var(--bg);
@@ -69,6 +107,63 @@ body {
     border: 1px solid var(--accent-mid);
     font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
     padding: 3px 10px; border-radius: 20px;
+}
+
+/* ── Dark mode toggle switch ── */
+.theme-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 10px;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1.5px solid var(--line);
+    background: var(--line-soft);
+    transition: background .2s, border-color .2s;
+}
+.theme-switch:hover {
+    border-color: var(--accent-mid);
+    background: var(--accent-bg);
+}
+.theme-switch-track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    background: var(--ink-faint);
+    border-radius: 10px;
+    transition: background .25s;
+    flex-shrink: 0;
+}
+.theme-switch-track::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: transform .25s cubic-bezier(.4,0,.2,1);
+}
+[data-theme="dark"] .theme-switch-track {
+    background: var(--accent);
+}
+[data-theme="dark"] .theme-switch-track::after {
+    transform: translateX(16px);
+}
+.theme-switch-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    white-space: nowrap;
+    min-width: 32px;
+    transition: color .2s;
+}
+[data-theme="dark"] .theme-switch-label {
+    color: var(--accent);
 }
 
 /* ── LAYOUT ── */
@@ -375,6 +470,10 @@ select.form-control { cursor: pointer; }
     <div class="navbar-sep"></div>
     <span class="navbar-sub">Floor Panel Properties</span>
     <span class="navbar-badge">proHolz Vol.1</span>
+    <label class="theme-switch" title="Klik untuk ganti tampilan terang/gelap" onclick="toggleTheme()">
+        <div class="theme-switch-track"></div>
+        <span class="theme-switch-label" id="theme-label">Light</span>
+    </label>
 </nav>
 
 <!-- ══ APP WRAPPER ═════════════════════════════════════════════════════ -->
