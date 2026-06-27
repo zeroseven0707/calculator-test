@@ -29,7 +29,8 @@ console.log('\n=== SHEAR ANALOGY ===');
 const layup5 = new CLTLayupType('5L', 1000, 5000);
 [0,90,0,90,0].forEach(a => layup5.addLayer(new CLTLayerType(35, a, MATERIAL_GRADES.MGP10)));
 const r5 = new ShearAnalogyMethod().calculate(layup5);
-assert('Shear 5L EIeff ≈ 2.122313E+12', Math.abs(r5.EIeff - 2.122313e12) < 1e6,
+// Expected: E=10000 MPa (MGP10 corrected), 5L-35 uniform, beff=1000
+assert('Shear 5L EIeff ≈ 1.9294E+13', Math.abs(r5.EIeff - 1.929375e13) < 1e7,
     'got: '+r5.EIeff.toExponential(6));
 
 // T2: 3-layer simetris
@@ -76,9 +77,9 @@ assert('Shear 2L → throw (<3)', underErr);
 
 console.log('\n=== GAMMA METHOD ===');
 
-// T8: Gamma 5-layer
+// T8: Gamma 5-layer — E=10000 MPa (MGP10 corrected)
 const r5g = new GammaMethod().calculate(layup5);
-assert('Gamma 5L EIeff ≈ 3.9E+11', Math.abs(r5g.EIeff - 3.89e11) < 2e9,
+assert('Gamma 5L EIeff ≈ 3.537E+12', Math.abs(r5g.EIeff - 3.536917e12) < 2e9,
     'got: '+r5g.EIeff.toExponential(6));
 assert('Gamma 5L gammaValues length = 3', r5g.gammaValues.length === 3);
 assert('Gamma 5L centroid tersedia', typeof r5g.centroid === 'number');

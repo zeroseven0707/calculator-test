@@ -18,6 +18,36 @@ class PanelProperties {
     calculate(cltLayup) {
         throw new Error('Metode calculate() harus di-override oleh subclass');
     }
+
+    /**
+     * Hitung kekakuan aksial efektif: EAeff = Σ Ei,XX × beff × ti
+     * @param {CLTLayupType} cltLayup
+     * @returns {number} N/m
+     */
+    calcEAeff(cltLayup) {
+        const beff = cltLayup.beff;
+        return cltLayup.getLayers().reduce((sum, l) => {
+            return sum + l.getExx() * beff * l.thickness;
+        }, 0);
+    }
+
+    /**
+     * Validasi pola alternating 0°/90° — warning saja, tidak throw.
+     * @param {CLTLayupType} cltLayup
+     * @returns {{ valid: boolean, message: string }}
+     */
+    checkAlternating(cltLayup) {
+        const layers = cltLayup.getLayers();
+        for (let i = 1; i < layers.length; i++) {
+            if (layers[i].angle === layers[i - 1].angle) {
+                return {
+                    valid: false,
+                    message: `Layer ${i} dan Layer ${i + 1} memiliki orientasi yang sama (${layers[i].angle}°). Pastikan pola 0°/90° alternating.`
+                };
+            }
+        }
+        return { valid: true, message: '' };
+    }
 }
 
 // ─── Shear Analogy Method ────────────────────────────────────────────────────
@@ -60,14 +90,24 @@ class ShearAnalogyMethod extends PanelProperties {
         const layers = cltLayup.getLayers();
         const beff   = cltLayup.beff;
 
+        // Periksa pola alternating (warning, bukan error)
+        const altCheck = this.checkAlternating(cltLayup);
+
         // Hitung yi = jarak dari dasar panel ke titik tengah layer-i
-        // Formula Excel: yi = SUM(layer-i ... layer-n) + ti/2
-        // (dihitung dari layer-i sampai layer terbawah, lalu tambah ti/2)
         const yi = layers.map((_, i) => {
             let sum = 0;
             for (let j = i; j < n; j++) sum += layers[j].thickness;
             return sum + layers[i].thickness / 2;
         });
+
+        // Centroid = Σ(Ei·Ai·yi) / Σ(Ei·Ai)
+        let sumEAy = 0, sumEA = 0;
+        layers.forEach((l, i) => {
+            const ea = l.getExx() * beff * l.thickness;
+            sumEAy  += ea * yi[i];
+            sumEA   += ea;
+        });
+        const centroid = sumEA > 0 ? sumEAy / sumEA : cltLayup.getTotalThickness() / 2;
 
         const layerProps = [];
         let EIeff = 0;
@@ -101,7 +141,11 @@ class ShearAnalogyMethod extends PanelProperties {
             }));
         }
 
-        return new PanelPropertiesType('ShearAnalogy', EIeff, layerProps);
+        const EAeff  = this.calcEAeff(cltLayup);
+        const result = new PanelPropertiesType('ShearAnalogy', EIeff, layerProps, EAeff);
+        result.centroid    = centroid;
+        result.altWarning  = altCheck.valid ? null : altCheck.message;
+        return result;
     }
 }
 
@@ -143,6 +187,9 @@ class GammaMethod extends PanelProperties {
         const layers = cltLayup.getLayers();
         const beff   = cltLayup.beff;
         const Lref   = cltLayup.Lref;
+
+        // Periksa pola alternating (warning, bukan error)
+        const altCheck = this.checkAlternating(cltLayup);
 
         // Layer efektif (0°) dan layer pemisah (90°)
         const effIdx = n === 3 ? [0, 2]    : [0, 2, 4];   // index layer 0°
@@ -229,10 +276,88 @@ class GammaMethod extends PanelProperties {
             }));
         }
 
-        const result       = new PanelPropertiesType('Gamma', EIeff, layerProps);
+        const EAeff  = this.calcEAeff(cltLayup);
+        const result = new PanelPropertiesType('Gamma', EIeff, layerProps, EAeff);
         result.gammaValues = gamma;
         result.aiValues    = ai;
         result.centroid    = centroid;
+        result.altWarning  = altCheck.valid ? null : altCheck.message;
         return result;
+    }
+}
+
+// ─── Deflection Calculator ───────────────────────────────────────────────────
+
+/**
+ * DeflectionCalculator — Menghitung defleksi mid-span dari beban merata.
+ * 
+ * Formula:
+ *   δ_max = 5wL⁴ / (384·EIeff)
+ * 
+ * di mana:
+ *   w    = beban merata (N/mm per mm lebar = kN/m²)
+ *   L    = bentang (mm)
+ *   EIeff = kekakuan lentur efektif (N·mm²)
+ * 
+ * Limit defleksi tipikal: L/300 (serviceability), L/400 (presisi tinggi)
+ */
+class DeflectionCalculator {
+    /**
+     * @param {number} EIeff   - Kekakuan lentur efektif (N·mm²/m)
+     * @param {number} beff    - Lebar efektif (mm)
+     * @param {number} L       - Bentang (mm)
+     * @param {number} wkPa    - Beban merata (kN/m²)
+     * @returns {{ delta: number, ratio: number, limitL300: number, limitL400: number, statusL300: string, statusL400: string }}
+     */
+    static calculate(EIeff, beff, L, wkPa) {
+        // Konversi beban: kN/m² → N/mm per mm lebar
+        // 1 kN/m² = 1000 N / (1000mm × 1000mm) = 0.001 N/mm²
+        // Beban per mm lebar per mm bentang = wkPa × 1000 / (1000 × 1000) = wkPa × 0.001
+        // w (N/mm/mm) = wkPa × 1e3 / 1e6 = wkPa × 1e-3 N/mm²
+        // Untuk EIeff per m lebar (beff=1000mm), w = wkPa [kN/m²] × 1000 [N/kN] / 1000 [mm/m] = wkPa N/mm per m
+        // Maka w_total = wkPa [N/mm] untuk lebar 1m
+        const w = wkPa * 1.0;  // N/mm (per m lebar, wkPa kN/m² = N/mm per m)
+
+        const delta = (5 * w * Math.pow(L, 4)) / (384 * EIeff);
+
+        const limitL300 = L / 300;
+        const limitL400 = L / 400;
+
+        return {
+            delta,
+            limitL300,
+            limitL400,
+            ratio300    : delta / limitL300,
+            ratio400    : delta / limitL400,
+            statusL300  : delta <= limitL300 ? 'OK' : 'NG',
+            statusL400  : delta <= limitL400 ? 'OK' : 'NG',
+        };
+    }
+}
+
+// ─── Comparison Calculator ───────────────────────────────────────────────────
+
+/**
+ * ComparisonCalculator — Menjalankan kedua metode (SA & Gamma) sekaligus
+ * dan mengembalikan keduanya beserta perbandingan.
+ * Hanya valid untuk 3 atau 5 layer.
+ */
+class ComparisonCalculator {
+    /**
+     * @param {CLTLayupType} cltLayup
+     * @returns {{ shearAnalogy: PanelPropertiesType, gamma: PanelPropertiesType, diff: number }}
+     */
+    static calculate(cltLayup) {
+        const n = cltLayup.getLayerCount();
+        if (n !== 3 && n !== 5) {
+            throw new Error('Comparison hanya tersedia untuk 3 atau 5 layer.');
+        }
+
+        const saResult = new ShearAnalogyMethod().calculate(cltLayup);
+        const gmResult = new GammaMethod().calculate(cltLayup);
+
+        const diff = ((gmResult.EIeff - saResult.EIeff) / saResult.EIeff) * 100;
+
+        return { shearAnalogy: saResult, gamma: gmResult, diffPercent: diff };
     }
 }
