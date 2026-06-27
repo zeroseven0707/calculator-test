@@ -16,7 +16,7 @@
 // ── Dark mode ─────────────────────────────────────────────────────────────────
 (function () {
     const saved = localStorage.getItem('clt-theme');
-    if (saved === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    if (saved !== 'light') document.documentElement.setAttribute('data-theme', 'dark');
 })();
 
 function toggleTheme() {
@@ -54,7 +54,9 @@ const PRESETS = {
 document.addEventListener('DOMContentLoaded', () => {
     // sync dark mode label
     const label = document.getElementById('theme-label');
-    if (document.documentElement.getAttribute('data-theme') === 'dark') {
+    if (document.documentElement.getAttribute('data-theme') !== 'dark') {
+        if (label) label.textContent = 'Light';
+    } else {
         if (label) label.textContent = 'Dark';
     }
 
